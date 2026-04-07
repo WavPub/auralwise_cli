@@ -1,0 +1,47 @@
+{
+  "name": "auralwise_cli",
+  "version": "1.0.3",
+  "description": "CLI for AuralWise audio intelligence API - transcription, speaker diarization, audio event detection",
+  "type": "module",
+  "bin": {
+    "auralwise": "./bin/auralwise.js"
+  },
+  "files": [
+    "bin/",
+    "lib/",
+    "README_CN.md"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [
+    "asr",
+    "speech-to-text",
+    "transcription",
+    "speaker-diarization",
+    "audio-events",
+    "auralwise",
+    "cli",
+    "audio",
+    "voice"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wavpub/auralwise_cli"
+  },
+  "homepage": "https://auralwise.cn",
+  "author": "WavPub",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "ora": "^8.1.0"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.0"
+  }
+}
