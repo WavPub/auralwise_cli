@@ -15,6 +15,7 @@ One API call returns transcription, speaker diarization, speaker embeddings, wor
 - **Audio Event Detection** — 521 AudioSet sound event classes (applause, cough, music, keyboard, etc.)
 - **VAD** — Voice Activity Detection segments
 - **Batch Mode** — Half-price processing using off-peak GPU capacity, delivered within 24h
+- **Local Transcoding + Vocal Enhancement** — Automatically transcodes audio to mono 16kHz 32kbps MP3 and applies a vocal enhancement filter chain (denoise, highpass, EQ, loudness normalization) before upload, cutting upload size dramatically and improving ASR accuracy on noisy recordings
 
 ## Installation
 
@@ -53,8 +54,17 @@ auralwise transcribe ./audio.mp3 --json --output result.json
 Submit an audio file for processing. `<source>` can be an HTTP(S) URL or a local file path.
 
 **Input modes:**
-- **URL mode** — Pass an `https://...` URL; the GPU node downloads directly
-- **File mode** — Pass a local file path; the CLI reads and uploads as base64
+- **URL mode** — Pass an `https://...` URL. By default the CLI downloads and transcodes the audio locally before upload; if ffmpeg is missing or transcoding is disabled, the URL is submitted directly to the API.
+- **File mode** — Pass a local file path; the CLI reads, transcodes, and uploads as base64.
+
+**Local transcoding pipeline (default ON):**
+
+When ffmpeg is available on your `PATH`, the CLI first converts your audio to mono 16kHz 32kbps MP3 with a vocal enhancement filter chain (afftdn denoise → 80Hz highpass → two-band EQ → dynaudnorm loudness). This typically shrinks uploads by 10-20× and yields cleaner ASR on noisy recordings. Temp files are deleted immediately after the upload succeeds.
+
+- If ffmpeg isn't installed, the CLI prints a one-time warning and submits the original file/URL unchanged.
+- If the filter chain is incompatible with a particular source, it falls back to a plain transcode (same format, no filters).
+- Upload size is capped at **150 MB**. A local file exceeding the limit aborts with an error; a URL source that exceeds the limit after transcoding falls back to submitting the URL directly.
+- Pass `--no-transcode` to skip transcoding entirely and upload the file as-is.
 
 **Common options:**
 
@@ -65,6 +75,7 @@ Submit an audio file for processing. `<source>` can be an HTTP(S) URL or a local
 | `--no-asr` | Disable transcription |
 | `--no-diarize` | Disable speaker diarization |
 | `--no-events` | Disable audio event detection |
+| `--no-transcode` | Skip local transcoding; upload the original file as-is |
 | `--hotwords <words>` | Boost recognition of specific words (comma-separated) |
 | `--num-speakers <n>` | Set fixed number of speakers |
 | `--max-speakers <n>` | Max speakers for auto-detection (default: 10) |
