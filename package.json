@@ -1,6 +1,6 @@
 {
   "name": "auralwise_cli",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "CLI for AuralWise audio intelligence API - transcription, speaker diarization, audio event detection",
   "type": "module",
   "bin": {
