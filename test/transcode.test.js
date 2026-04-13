@@ -8,9 +8,13 @@ import {
   isFfmpegAvailable,
   tmpMp3Path,
   transcodeToMp3,
+  probeDurationSeconds,
   safeUnlink,
   fileSize,
   MAX_UPLOAD_BYTES,
+  MIN_FILE_BYTES,
+  MAX_FILE_BYTES,
+  MAX_DURATION_SECONDS,
   VOCAL_FILTER_CHAIN,
 } from '../lib/transcode.js';
 
@@ -19,6 +23,30 @@ const hasFfmpeg = spawnSync('ffmpeg', ['-version'], { stdio: 'ignore' }).status 
 describe('transcode module', () => {
   it('exposes 150MB upload limit', () => {
     expect(MAX_UPLOAD_BYTES).toBe(150 * 1024 * 1024);
+  });
+
+  it('exposes upstream service limits (1KB-2GB, 5h)', () => {
+    expect(MIN_FILE_BYTES).toBe(1024);
+    expect(MAX_FILE_BYTES).toBe(2 * 1024 * 1024 * 1024);
+    expect(MAX_DURATION_SECONDS).toBe(18000);
+  });
+
+  (hasFfmpeg ? it : it.skip)('probeDurationSeconds reports a generated clip length', async () => {
+    const wav = join(tmpdir(), `dur-${randomUUID()}.wav`);
+    spawnSync('ffmpeg', [
+      '-hide_banner', '-loglevel', 'error', '-y',
+      '-f', 'lavfi', '-i', 'anullsrc=channel_layout=mono:sample_rate=16000',
+      '-t', '2', wav,
+    ]);
+    const d = await probeDurationSeconds(wav);
+    expect(d).toBeGreaterThan(1.5);
+    expect(d).toBeLessThan(2.5);
+    await unlink(wav);
+  }, 20000);
+
+  it('probeDurationSeconds returns null for nonexistent input', async () => {
+    const d = await probeDurationSeconds(join(tmpdir(), `missing-${randomUUID()}.wav`));
+    expect(d).toBeNull();
   });
 
   it('isFfmpegAvailable returns boolean', () => {

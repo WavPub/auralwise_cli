@@ -66,6 +66,14 @@ When ffmpeg is available on your `PATH`, the CLI first converts your audio to mo
 - Upload size is capped at **150 MB**. A local file exceeding the limit aborts with an error; a URL source that exceeds the limit after transcoding falls back to submitting the URL directly.
 - Pass `--no-transcode` to skip transcoding entirely and upload the file as-is.
 
+**Upstream service limits** (validated locally before upload):
+
+| Limit | Value | Notes |
+|-------|-------|-------|
+| Minimum file size | 1 KB | Anything smaller is rejected as not a valid audio file |
+| Maximum file size | 2 GB | Upstream hard cap |
+| Maximum duration | 5 hours | Probed via ffprobe when available; otherwise enforced server-side |
+
 **Common options:**
 
 | Option | Description |
