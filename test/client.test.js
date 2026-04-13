@@ -47,7 +47,7 @@ describe('AuralWiseClient', () => {
   describe('constructor', () => {
     it('should use default base URL when not provided', () => {
       const c = new AuralWiseClient({ apiKey: 'k' });
-      expect(c.baseUrl).toBe('https://auralwise.cn/api/v1');
+      expect(c.baseUrl).toBe('https://api.auralwise.cn/v1');
     });
 
     it('should strip trailing slashes from base URL', () => {

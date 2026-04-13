@@ -154,10 +154,10 @@ auralwise --api-key asr_xxxx transcribe ./audio.mp3
 
 ### 自定义 API 地址
 
-私有化部署时可修改 API 地址（默认 `https://auralwise.cn/api/v1`）：
+私有化部署时可修改 API 地址（默认 `https://api.auralwise.cn/v1`）：
 
 ```bash
-auralwise --base-url https://your-private-instance.com/api/v1 transcribe ./audio.mp3
+auralwise --base-url https://your-private-instance.com/v1 transcribe ./audio.mp3
 ```
 
 ### 界面语言

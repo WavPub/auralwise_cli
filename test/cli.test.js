@@ -32,7 +32,7 @@ describe('CLI entry', () => {
 
   it('should show version with --version', async () => {
     const { stdout } = await run('--version');
-    expect(stdout.trim()).toBe('1.0.3');
+    expect(stdout.trim()).toBe('1.0.5');
   });
 
   it('should show Chinese UI with --locale zh', async () => {
@@ -47,6 +47,7 @@ describe('CLI entry', () => {
     expect(stdout).toContain('--language');
     expect(stdout).toContain('--no-asr');
     expect(stdout).toContain('--no-diarize');
+    expect(stdout).toContain('--no-transcode');
     expect(stdout).toContain('--optimize-zh');
     expect(stdout).toContain('--beam-size');
     expect(stdout).toContain('--hotwords');
@@ -100,7 +101,7 @@ describe('CLI entry', () => {
 
   it('should show Chinese option descriptions with --locale zh for transcribe', async () => {
     const { stdout } = await run('--locale', 'zh', 'transcribe', '--help');
-    expect(stdout).toContain('强制使用 Base64 模式上传本地文件');
+    expect(stdout).toContain('禁用本地转码');
     expect(stdout).toContain('禁用语音转写');
     expect(stdout).toContain('禁用说话人分离');
     expect(stdout).toContain('启用中文精简模式');

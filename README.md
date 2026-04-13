@@ -151,10 +151,10 @@ auralwise --api-key asr_xxxx transcribe ./audio.mp3
 
 ### Base URL
 
-Override the API endpoint (default: `https://auralwise.cn/api/v1`):
+Override the API endpoint (default: `https://api.auralwise.cn/v1`):
 
 ```bash
-auralwise --base-url https://your-private-instance.com/api/v1 transcribe ./audio.mp3
+auralwise --base-url https://your-private-instance.com/v1 transcribe ./audio.mp3
 ```
 
 ### Language

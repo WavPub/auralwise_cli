@@ -1,7 +1,14 @@
 #!/usr/bin/env node
 
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { Command } from 'commander';
 import { setLocale, t } from '../lib/i18n.js';
+
+const pkg = JSON.parse(
+  readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf8')
+);
 import { registerTranscribe } from '../lib/commands/transcribe.js';
 import { registerTasks } from '../lib/commands/tasks.js';
 import { registerTask } from '../lib/commands/task.js';
@@ -20,9 +27,9 @@ const program = new Command();
 program
   .name('auralwise')
   .description(t('descMain'))
-  .version('1.0.3')
+  .version(pkg.version)
   .option('--api-key <key>', t('optApiKey'))
-  .option('--base-url <url>', t('optBaseUrl'), 'https://auralwise.cn/api/v1')
+  .option('--base-url <url>', t('optBaseUrl'), 'https://api.auralwise.cn/v1')
   .option('--locale <locale>', t('optLocale'));
 
 registerTranscribe(program);
