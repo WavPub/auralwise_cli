@@ -8,7 +8,7 @@ One API call returns transcription, speaker diarization, speaker embeddings, wor
 
 ## Features
 
-- **Speech Transcription** — 99 languages, with a dedicated Chinese engine (`optimize_zh`) for faster speed and higher accuracy
+- **Speech Transcription** — 99 languages, with two tiers controlled by `optimize`: an **optimize tier** (faster & cheaper, segment-level timestamps) for zh/en/es/fr/pt, and a **standard tier** (highest quality, word-level timestamps) for all languages. By default the server auto-selects the tier by detected language
 - **Speaker Diarization** — Automatic speaker count detection, per-segment speaker labels
 - **Speaker Embeddings** — 192-dim voice print vectors for cross-recording speaker matching
 - **Timestamps** — Word-level (~10ms) or segment-level (~100ms) precision
@@ -37,8 +37,12 @@ auralwise transcribe https://example.com/meeting.mp3
 # Transcribe a local file (auto base64 upload)
 auralwise transcribe ./recording.wav
 
-# Chinese optimization mode (faster, cheaper for Chinese audio)
-auralwise transcribe ./meeting.mp3 --optimize-zh --language zh
+# By default the server picks the tier by language. Force the optimize tier
+# (faster, cheaper, segment-level timestamps) explicitly:
+auralwise transcribe ./meeting.mp3 --optimize --language zh
+
+# Force the standard tier (highest quality, word-level timestamps):
+auralwise transcribe ./interview.mp3 --standard
 
 # Submit without waiting
 auralwise transcribe https://example.com/audio.mp3 --no-wait
@@ -79,7 +83,8 @@ When ffmpeg is available on your `PATH`, the CLI first converts your audio to mo
 | Option | Description |
 |--------|-------------|
 | `--language <lang>` | ASR language code (`zh`, `en`, `ja`, ...) or auto-detect if omitted |
-| `--optimize-zh` | Use dedicated Chinese engine (faster, cheaper, segment-level timestamps) |
+| `--optimize` | Force optimize tier (faster, cheaper, segment-level timestamps; zh/en/es/fr/pt) |
+| `--standard` | Force standard tier (highest quality, word-level timestamps, all languages) |
 | `--no-asr` | Disable transcription |
 | `--no-diarize` | Disable speaker diarization |
 | `--no-events` | Disable audio event detection |
@@ -98,9 +103,14 @@ When ffmpeg is available on your `PATH`, the CLI first converts your audio to mo
 | Option | Description |
 |--------|-------------|
 | `--beam-size <n>` | Beam search width (default: 5) |
+| `--best-of <n>` | Best-of sampling count, 1-20 (only when `--temperature` > 0) |
 | `--temperature <n>` | Decoding temperature (default: 0.0) |
 | `--initial-prompt <text>` | Guide transcription style |
+| `--timestamp-level <level>` | `word` or `segment` (optimize tier only; experimental) |
 | `--vad-threshold <n>` | VAD sensitivity 0-1 (default: 0.35) |
+| `--vad-speech-pad <ms>` | Speech segment padding in ms (default: 30) |
+| `--diarize-min-segment <s>` | Min segment duration (sec) for embedding extraction (default: 0.5) |
+| `--diarize-single-speaker-threshold <n>` | Single-speaker detection threshold (default: 0.05) |
 | `--events-threshold <n>` | Audio event confidence threshold (default: 0.3) |
 | `--events-classes <list>` | Only detect specific event classes |
 
@@ -191,7 +201,7 @@ auralwise --locale en transcribe --help  # English interface (default)
 
 ```bash
 auralwise transcribe ./meeting.mp3 \
-  --optimize-zh \
+  --optimize \
   --language zh \
   --max-speakers 5 \
   --output meeting_result.json
@@ -256,12 +266,25 @@ Speaker Embeddings
 
 Returns the full API response. See [API documentation](https://auralwise.cn/api-docs) for the complete schema.
 
+## Transcription tiers
+
+Two tiers are selected via `optimize` (the legacy `--optimize-zh` flag is a deprecated alias for `--optimize`):
+
+| | Optimize tier (`--optimize`) | Standard tier (`--standard`) |
+|---|---|---|
+| Languages | zh, en, es, fr, pt | All languages |
+| Timestamps | Segment-level (`start`/`end`, no `words`) | Word-level (`words[]`) |
+| Strengths | Faster, cheaper | Highest quality, hotwords, code-switching |
+| Billing | `zh_lite` rate | `standard` rate |
+
+**Default (no flag): the server auto-selects by detected language** — zh/en/es/fr/pt use the optimize tier, others fall back to standard. Non-eligible languages always run on the standard tier even with `--optimize`. Pass `--standard` to force word-level timestamps on every language.
+
 ## Pricing
 
 | Capability | Standard | Batch (50% off) |
 |-----------|----------|-----------------|
-| Chinese transcription | ¥0.27/hr | ¥0.14/hr |
-| General transcription (with word timestamps) | ¥1.20/hr | ¥0.60/hr |
+| Optimize tier (zh/en/es/fr/pt) | ¥0.27/hr | ¥0.14/hr |
+| Standard tier (all languages, word timestamps) | ¥1.20/hr | ¥0.60/hr |
 | Speaker diarization (labels + embeddings) | +¥0.40/hr | +¥0.20/hr |
 | Audio event detection (521 classes) | +¥0.10/hr | +¥0.05/hr |
 

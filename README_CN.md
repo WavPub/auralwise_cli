@@ -8,7 +8,7 @@
 
 ## 核心能力
 
-- **语音转写** — 支持 99 种语言，中文场景使用专用引擎（`optimize_zh`），速度更快、准确率更高
+- **语音转写** — 支持 99 种语言，通过 `optimize` 提供两档：**优化档**（更快更省、段级时间戳，适用中/英/西/法/葡）与**标准档**（最高质量、词级时间戳，全语言）。默认由服务端按检测语言自动选档
 - **说话人分离** — 自动检测说话人数量，为每段文本标注说话人标签
 - **说话人声纹向量** — 192 维声纹向量，可用于跨录音比对同一说话人
 - **精准时间戳** — 词级（~10ms）或段级（~100ms）精度
@@ -37,8 +37,11 @@ auralwise transcribe https://example.com/meeting.mp3
 # 本地文件转写（自动 base64 上传）
 auralwise transcribe ./recording.wav
 
-# 中文精简模式（更快、更便宜）
-auralwise transcribe ./meeting.mp3 --optimize-zh --language zh
+# 默认由服务端按语言自动选档。显式强制优化档（更快、更省、段级时间戳）：
+auralwise transcribe ./meeting.mp3 --optimize --language zh
+
+# 强制标准档（最高质量、词级时间戳）：
+auralwise transcribe ./interview.mp3 --standard
 
 # 提交后立即返回，不等待完成
 auralwise transcribe https://example.com/audio.mp3 --no-wait
@@ -82,7 +85,8 @@ auralwise --locale zh transcribe --help
 | 选项 | 说明 |
 |------|------|
 | `--language <lang>` | ASR 识别语言（`zh`、`en`、`ja` 等），不指定则自动检测 |
-| `--optimize-zh` | 使用中文专用引擎（更快、更便宜，段级时间戳） |
+| `--optimize` | 强制优化档（更快、更省，段级时间戳；中/英/西/法/葡） |
+| `--standard` | 强制标准档（最高质量，词级时间戳，全语言） |
 | `--no-asr` | 禁用语音转写 |
 | `--no-diarize` | 禁用说话人分离 |
 | `--no-events` | 禁用声音事件检测 |
@@ -101,9 +105,14 @@ auralwise --locale zh transcribe --help
 | 选项 | 说明 |
 |------|------|
 | `--beam-size <n>` | Beam Search 宽度（默认 5） |
+| `--best-of <n>` | Best-of 采样数 1-20（仅 `--temperature` > 0 时生效） |
 | `--temperature <n>` | 解码温度（默认 0.0） |
 | `--initial-prompt <text>` | 初始提示文本，引导转写风格 |
+| `--timestamp-level <level>` | `word` 或 `segment`（仅优化档生效；实验性） |
 | `--vad-threshold <n>` | VAD 语音检测阈值 0-1（默认 0.35） |
+| `--vad-speech-pad <ms>` | 语音段前后填充时长（毫秒，默认 30） |
+| `--diarize-min-segment <s>` | 提取声纹所需最短语音段时长（秒，默认 0.5） |
+| `--diarize-single-speaker-threshold <n>` | 单说话人判定阈值（默认 0.05） |
 | `--events-threshold <n>` | 声音事件置信度阈值（默认 0.3） |
 | `--events-classes <list>` | 仅检测指定的事件类别 |
 
@@ -194,7 +203,7 @@ auralwise --locale en transcribe --help  # 英文界面（默认）
 
 ```bash
 auralwise transcribe ./meeting.mp3 \
-  --optimize-zh \
+  --optimize \
   --language zh \
   --max-speakers 5 \
   --output meeting_result.json
@@ -259,12 +268,25 @@ Speaker Embeddings
 
 返回完整的 API 响应，详见 [API 文档](https://auralwise.cn/api-docs)。
 
+## 转写档位
+
+通过 `optimize` 选择两档（旧的 `--optimize-zh` 是 `--optimize` 的已废弃别名）：
+
+| | 优化档（`--optimize`） | 标准档（`--standard`） |
+|---|---|---|
+| 适用语言 | 中、英、西、法、葡 | 全语言 |
+| 时间戳 | 段级（`start`/`end`，无 `words`） | 词/字级（`words[]`） |
+| 取向 | 更快、更省 | 最高质量、热词、中英混读更准 |
+| 计费档位 | `zh_lite` 单价 | `standard` 单价 |
+
+**默认（不带 flag）由服务端按检测语言自动选档** —— 中/英/西/法/葡走优化档，其他语言落标准档。非适用语言即使加 `--optimize` 也自动落标准档。需要全语言都拿词级时间戳时，加 `--standard` 强制标准档。
+
 ## 定价
 
 | 能力 | 标准价格 | 批量模式（五折） |
 |------|---------|----------------|
-| 中文转写 | ¥0.27/小时 | ¥0.14/小时 |
-| 通用转写（含词级时间戳） | ¥1.20/小时 | ¥0.60/小时 |
+| 优化档（中/英/西/法/葡） | ¥0.27/小时 | ¥0.14/小时 |
+| 标准档（全语言，词级时间戳） | ¥1.20/小时 | ¥0.60/小时 |
 | 说话人分离（标签 + 声纹向量） | +¥0.40/小时 | +¥0.20/小时 |
 | 声音事件检测（521 类） | +¥0.10/小时 | +¥0.05/小时 |
 

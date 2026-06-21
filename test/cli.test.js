@@ -32,7 +32,7 @@ describe('CLI entry', () => {
 
   it('should show version with --version', async () => {
     const { stdout } = await run('--version');
-    expect(stdout.trim()).toBe('1.0.8');
+    expect(stdout.trim()).toBe('1.1.0');
   });
 
   it('should show Chinese UI with --locale zh', async () => {
@@ -104,7 +104,8 @@ describe('CLI entry', () => {
     expect(stdout).toContain('禁用本地转码');
     expect(stdout).toContain('禁用语音转写');
     expect(stdout).toContain('禁用说话人分离');
-    expect(stdout).toContain('启用中文精简模式');
+    expect(stdout).toContain('优化档');
+    expect(stdout).toContain('标准档');
     expect(stdout).toContain('以 JSON 格式输出');
     expect(stdout).toContain('将结果保存到文件');
   });
