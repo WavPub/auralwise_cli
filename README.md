@@ -16,6 +16,7 @@ One API call returns transcription, speaker diarization, speaker embeddings, wor
 - **VAD** — Voice Activity Detection segments
 - **Batch Mode** — Half-price processing using off-peak GPU capacity, delivered within 24h
 - **Local Transcoding + Vocal Enhancement** — Automatically transcodes audio to mono 16kHz 32kbps MP3 and applies a vocal enhancement filter chain (denoise, highpass, EQ, loudness normalization) before upload, cutting upload size dramatically and improving ASR accuracy on noisy recordings
+- **Account & Rate-limit Aware** — `account` command surfaces balance, tier limits, and usage; automatic `Retry-After` backoff on rate-limit (429), with optional client-side request pacing
 
 ## Installation
 
@@ -164,6 +165,49 @@ auralwise events --category Music      # Filter by category
 auralwise events --json                # JSON output
 ```
 
+### `auralwise account`
+
+Show your account balance, effective limits, and current usage — read this before batch-submitting to pace yourself and avoid 402/429.
+
+```bash
+auralwise account          # Pretty-printed
+auralwise account --json   # Raw JSON
+```
+
+```
+Account
+
+  Available: ¥1001.70
+  Balance: ¥999.00
+  Held: ¥0.00
+  Resource pack: ¥2.70
+  Tier: 3
+  Concurrency: 0 active / 11 limit (11 available)
+  Batch in progress: 0
+  Rate limit: 11 req/s (burst 11)
+```
+
+| Field | Meaning |
+|-------|---------|
+| `available_balance` | Actual gate for submitting tasks = `balance + resource_pack − held_amount`. Below the task cost → **402**. |
+| `held_amount` | Funds frozen by in-flight tasks (released on completion/failure). |
+| `concurrency_limit` / `available_concurrency` | Max simultaneous non-batch tasks, and how many you can still submit now. 0 → **429** `concurrency_limit_exceeded`. |
+| `tps_limit` / `tps_burst` | Request rate cap (req/s) and burst capacity, shared across **all** `/v1` requests. Over the cap → **429** `rate_limited`. |
+| `waiting_batch_tasks` | Batch tasks in progress (batch is exempt from the concurrency limit). |
+
+## Rate limits & automatic retries
+
+The API enforces two independent limits, both scaled by account tier (see `auralwise account`):
+
+- **Request rate (TPS)** — a per-account token bucket over **all** `/v1` requests. Exceeding it returns `429 rate_limited` with a `Retry-After` header.
+- **Concurrency** — max simultaneous non-batch tasks, checked only when submitting. Exceeding it returns `429 concurrency_limit_exceeded` (batch tasks are exempt).
+
+The CLI handles these for you:
+
+- **Automatic backoff on `rate_limited`** — honors the server's `Retry-After`, then exponential backoff with jitter, up to `--max-retries` times (default 5). Safe because a rate-limited request is rejected before creating anything.
+- **Clear, actionable errors** — `402` (recharge / wait), `429 concurrency_limit_exceeded` (wait for slots or use `--batch`), and exhausted `rate_limited` retries are surfaced with a hint instead of being retried blindly.
+- **Optional client-side pacing** — pass `--tps <n>` (and `--burst <n>`) to proactively cap outgoing requests to your account's `tps_limit`, smoothing bursts before they hit the server.
+
 ## Configuration
 
 ### API Key
@@ -193,6 +237,19 @@ The CLI supports English and Chinese interfaces:
 ```bash
 auralwise --locale zh --help           # Chinese interface
 auralwise --locale en transcribe --help  # English interface (default)
+```
+
+### Rate limiting (global flags)
+
+| Flag | Description |
+|------|-------------|
+| `--tps <n>` | Client-side request rate cap in req/s (match your account `tps_limit`; `0` = off, default) |
+| `--burst <n>` | Burst capacity for `--tps` pacing (default: 5) |
+| `--max-retries <n>` | Max automatic retries on `429 rate_limited` before giving up (default: 5) |
+
+```bash
+# Proactively pace to a tier-3 account's limit (11 req/s) during a busy loop
+auralwise --tps 11 --burst 11 tasks --page-size 50
 ```
 
 ## Examples

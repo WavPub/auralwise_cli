@@ -32,7 +32,7 @@ describe('CLI entry', () => {
 
   it('should show version with --version', async () => {
     const { stdout } = await run('--version');
-    expect(stdout.trim()).toBe('1.1.0');
+    expect(stdout.trim()).toBe('1.2.0');
   });
 
   it('should show Chinese UI with --locale zh', async () => {

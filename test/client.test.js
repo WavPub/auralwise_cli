@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { AuralWiseClient } from '../lib/client.js';
+import { AuralWiseClient, ApiError } from '../lib/client.js';
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -38,6 +38,24 @@ function makeEmptyResponse(status = 204) {
     headers: { get: () => null },
     json: () => Promise.resolve(null),
     text: () => Promise.resolve(''),
+  };
+}
+
+// Error response with optional Retry-After header and JSON error body.
+function makeErrResponse(status, body, { retryAfter } = {}) {
+  return {
+    ok: false,
+    status,
+    headers: {
+      get: (key) => {
+        const k = String(key).toLowerCase();
+        if (k === 'content-type') return 'application/json';
+        if (k === 'retry-after' && retryAfter != null) return String(retryAfter);
+        return null;
+      },
+    },
+    json: () => Promise.resolve(body),
+    text: () => Promise.resolve(JSON.stringify(body)),
   };
 }
 
@@ -215,6 +233,67 @@ describe('AuralWiseClient', () => {
       });
 
       await expect(client.getTask('x')).rejects.toThrow('API error 500: Internal Server Error');
+    });
+  });
+
+  describe('getAccount', () => {
+    it('should get account info', async () => {
+      const acct = {
+        balance: 100, held_amount: 3.25, available_balance: 96.75,
+        tier: 3, concurrency_limit: 10, active_tasks: 2, available_concurrency: 8,
+        waiting_batch_tasks: 5, tps_limit: 2, tps_burst: 12, rate_limited: true,
+      };
+      mockFetch.mockResolvedValueOnce(makeResponse(acct));
+
+      const result = await client.getAccount();
+      expect(result).toEqual(acct);
+      expect(mockFetch.mock.calls[0][0]).toBe('https://api.test.com/v1/account');
+    });
+  });
+
+  describe('rate limiting & retries', () => {
+    it('retries on 429 rate_limited then succeeds', async () => {
+      const c = new AuralWiseClient({ apiKey: 'k', baseUrl: 'https://api.test.com/v1', retryBaseMs: 1, maxRetries: 3 });
+      mockFetch
+        .mockResolvedValueOnce(makeErrResponse(429, { error: 'slow down', error_code: 'rate_limited', retry_after_seconds: 0 }, { retryAfter: 0 }))
+        .mockResolvedValueOnce(makeErrResponse(429, { error: 'slow down', error_code: 'rate_limited', retry_after_seconds: 0 }, { retryAfter: 0 }))
+        .mockResolvedValueOnce(makeResponse({ id: 't1', status: 'done' }));
+
+      const result = await c.getTask('t1');
+      expect(result.status).toBe('done');
+      expect(mockFetch).toHaveBeenCalledTimes(3);
+    });
+
+    it('gives up after maxRetries on persistent 429 rate_limited', async () => {
+      const c = new AuralWiseClient({ apiKey: 'k', baseUrl: 'https://api.test.com/v1', retryBaseMs: 1, maxRetries: 2 });
+      mockFetch.mockResolvedValue(makeErrResponse(429, { error: 'slow down', error_code: 'rate_limited' }, { retryAfter: 0 }));
+
+      await expect(c.getTask('t1')).rejects.toThrow('API error 429');
+      expect(mockFetch).toHaveBeenCalledTimes(3); // 1 initial + 2 retries
+    });
+
+    it('does NOT retry concurrency_limit_exceeded (surfaces ApiError)', async () => {
+      const c = new AuralWiseClient({ apiKey: 'k', baseUrl: 'https://api.test.com/v1', retryBaseMs: 1, maxRetries: 3 });
+      mockFetch.mockResolvedValueOnce(makeErrResponse(429, { error: 'too many active', error_code: 'concurrency_limit_exceeded' }));
+
+      let caught;
+      try { await c.createTask({ audioUrl: 'https://x/a.mp3' }); } catch (e) { caught = e; }
+      expect(caught).toBeInstanceOf(ApiError);
+      expect(caught.status).toBe(429);
+      expect(caught.errorCode).toBe('concurrency_limit_exceeded');
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('does NOT retry 402 and exposes status/errorCode on ApiError', async () => {
+      const c = new AuralWiseClient({ apiKey: 'k', baseUrl: 'https://api.test.com/v1', retryBaseMs: 1 });
+      mockFetch.mockResolvedValueOnce(makeErrResponse(402, { error: 'insufficient balance', error_code: 'insufficient_balance' }));
+
+      let caught;
+      try { await c.createTask({ audioUrl: 'https://x/a.mp3' }); } catch (e) { caught = e; }
+      expect(caught).toBeInstanceOf(ApiError);
+      expect(caught.status).toBe(402);
+      expect(caught.errorCode).toBe('insufficient_balance');
+      expect(mockFetch).toHaveBeenCalledTimes(1);
     });
   });
 

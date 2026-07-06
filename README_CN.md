@@ -16,6 +16,7 @@
 - **语音活动检测** — VAD 语音段识别
 - **批量模式** — 使用闲时 GPU 算力，价格直接五折，24 小时内交付
 - **本地转码 + 人声增强** — 上传前自动转码为单声道 16kHz 32kbps MP3，并应用人声增强滤镜链（降噪、高通、均衡、响度归一化），大幅减小上传体积并提升嘈杂录音的识别准确率
+- **账户与限流感知** — `account` 命令查看余额、等级限额与用量；触发请求限速（429）时自动按 `Retry-After` 退避重试，并可选客户端主动节流
 
 ## 安装
 
@@ -166,6 +167,49 @@ auralwise events --category Music      # 按类别过滤
 auralwise events --json                # JSON 输出
 ```
 
+### `auralwise account`
+
+查看账户余额、生效限额与当前用量 —— 批量提交前先看一眼，据此自控节奏，避免触发 402/429。
+
+```bash
+auralwise account          # 格式化输出
+auralwise account --json   # 原始 JSON
+```
+
+```
+账户信息
+
+  可用额度: ¥1001.70
+  余额: ¥999.00
+  冻结（处理中预占）: ¥0.00
+  资源包等值额度: ¥2.70
+  账户等级: 3
+  并发任务: 0 活跃 / 11 上限（还可提交 11）
+  批量处理中: 0
+  请求速率上限: 11 次/秒（突发 11）
+```
+
+| 字段 | 含义 |
+|------|------|
+| `available_balance` | 提交任务的实际闸门 = `balance + 资源包等值 − held_amount`，低于任务费用 → **402** |
+| `held_amount` | 处理中任务冻结的金额（完成/失败后释放） |
+| `concurrency_limit` / `available_concurrency` | 同时进行的非批量任务上限、以及当前还能提交几个。为 0 → **429** `concurrency_limit_exceeded` |
+| `tps_limit` / `tps_burst` | 请求速率上限（次/秒）与突发容量，对**全部** `/v1` 请求共享。超限 → **429** `rate_limited` |
+| `waiting_batch_tasks` | 处理中的批量任务数（批量任务豁免并发限制） |
+
+## 限流与自动重试
+
+API 有两个相互独立、按账户等级伸缩的限制（数值见 `auralwise account`）：
+
+- **请求速率（TPS）** —— 按账户的令牌桶，对**全部** `/v1` 请求生效。超限返回 `429 rate_limited`，带 `Retry-After` 头。
+- **并发任务数** —— 同时进行的非批量任务上限，仅在提交任务时检查。超限返回 `429 concurrency_limit_exceeded`（批量任务豁免）。
+
+CLI 已为你处理：
+
+- **`rate_limited` 自动退避** —— 优先遵循服务端 `Retry-After`，再叠加带抖动的指数退避，最多重试 `--max-retries` 次（默认 5）。安全，因为被限速的请求在建任务前就被拒绝。
+- **清晰可操作的错误** —— `402`（充值/等待）、`429 concurrency_limit_exceeded`（等待空位或改用 `--batch`）、以及重试耗尽的 `rate_limited`，都会给出提示而非盲目重试。
+- **可选客户端节流** —— 传 `--tps <n>`（配合 `--burst <n>`）主动把出站请求限制在账户 `tps_limit` 内，在请求到达服务端前就削峰。
+
 ## 配置
 
 ### API Key
@@ -195,6 +239,19 @@ CLI 支持中英文界面切换：
 ```bash
 auralwise --locale zh --help             # 中文界面
 auralwise --locale en transcribe --help  # 英文界面（默认）
+```
+
+### 限流（全局参数）
+
+| 参数 | 说明 |
+|------|------|
+| `--tps <n>` | 客户端请求速率上限（次/秒，建议匹配账户 `tps_limit`；`0`=关闭，默认） |
+| `--burst <n>` | `--tps` 节流的突发容量（默认 5） |
+| `--max-retries <n>` | 触发 `429 rate_limited` 时的最大自动重试次数（默认 5） |
+
+```bash
+# 在密集轮询/批量循环时，主动限速到 tier-3 账户上限（11 次/秒）
+auralwise --tps 11 --burst 11 tasks --page-size 50
 ```
 
 ## 使用示例

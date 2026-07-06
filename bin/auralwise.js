@@ -15,6 +15,7 @@ import { registerTask } from '../lib/commands/task.js';
 import { registerResult } from '../lib/commands/result.js';
 import { registerDelete } from '../lib/commands/delete.js';
 import { registerEvents } from '../lib/commands/events.js';
+import { registerAccount } from '../lib/commands/account.js';
 
 // Parse --locale early before command registration so descriptions use correct language
 const localeIdx = process.argv.indexOf('--locale');
@@ -30,7 +31,10 @@ program
   .version(pkg.version)
   .option('--api-key <key>', t('optApiKey'))
   .option('--base-url <url>', t('optBaseUrl'), 'https://api.auralwise.cn/v1')
-  .option('--locale <locale>', t('optLocale'));
+  .option('--locale <locale>', t('optLocale'))
+  .option('--tps <n>', t('optTps'), parseFloat)
+  .option('--burst <n>', t('optBurst'), parseInt)
+  .option('--max-retries <n>', t('optMaxRetries'), parseInt);
 
 registerTranscribe(program);
 registerTasks(program);
@@ -38,5 +42,6 @@ registerTask(program);
 registerResult(program);
 registerDelete(program);
 registerEvents(program);
+registerAccount(program);
 
 program.parse();
